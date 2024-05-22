@@ -4,7 +4,7 @@
             <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
                 <strong class="font-bold">Éxito!</strong>
                 <span class="block sm:inline">{{ $message }}</span>
-                <a hx-get="/api/viaje/get-view"
+                <a hx-post="/api/viajes/get-view"
                     hx-trigger="click"
                     hx-target="#body"
                     hx-swap="innerHTML"

@@ -6,45 +6,11 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Viajes;
 use Exception;
-Use Symfony\Component\HttpFoundation\Response;
+Use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpFoundation\Response;
 
 class ViajesController extends Controller
 {
-    public function index()
-    {
-        $viajes = Viajes::all();
-        return response()->json([
-            'result' => $viajes
-        ], Response::HTTP_OK);
-    }
-
-    public function store(Request $request)
-    {
-        $viaje = new Viajes();
-        $viaje->nombre = $request->nombre;
-        $viaje->descripcion = $request->descripcion;
-        $viaje->save();
-
-        return response()->json(['result' => $viaje], Response::HTTP_CREATED);
-
-    }
-
-    public function update(Request $request, $id)
-    {
-        $viaje = Viajes::findOrFail($id);
-        $viaje->nombre = $request->nombre;
-        $viaje->descripcion = $request->descripcion;
-        $viaje->save();
-        return response()->json(['result' => $viaje], Response::HTTP_OK);
-
-    }
-
-    public function destroy($id)
-    {
-        $viaje = Viajes::findOrFail($id);
-        $viaje->delete();
-        return response()->json(['result' => 'Viaje eliminado'], Response::HTTP_OK);
-    }
 
     public function create()
     {
@@ -53,8 +19,76 @@ class ViajesController extends Controller
 
     public function show_viajes()
     {
+        $request = request();
+        $nombreUsuario = $request->input('nombreUsuario');
         $viajes = Viajes::all();
-        return view('viajes.index', compact('viajes'));
+
+        return view('viajes.index', compact('viajes', 'nombreUsuario'));
+    }
+
+    public function subscribe($id)
+    {
+        $viaje = Viajes::findOrFail($id);
+        return view('viajes.subscribe', compact('viaje'));
+    }
+
+    public function append_viajero()
+    {
+        $request = request();
+        $id = $request->input('id');
+        $request->validate([
+            'viajeros' => 'required|array',
+            'viajeros.*.nombre' => 'required|string|max:255',
+            'viajeros.*.edad' => 'required|integer|min:0',
+            'viajeros.*.nacionalidad' => 'required|string|max:255',
+            'viajeros.*.sexo' => 'required|string|in:Masculino,Femenino',
+            'viajeros.*.experiencia' => 'string|max:255',
+        ]);
+        
+        $viaje = Viajes::findOrFail($id);
+        
+        try {
+            foreach ($request->input('viajeros') as $viajero) {
+                $viajero = [
+                    'nombre' => $viajero['nombre'],
+                    'edad' => $viajero['edad'],
+                    'nacionalidad' => $viajero['nacionalidad'],
+                    'sexo' => $viajero['sexo'],
+                    'experiencia' => $viajero['experiencia'] ?? '',
+                ];
+                
+                $viaje->viajeros = array_merge($viaje->viajeros, [$viajero]);
+            } 
+            $viaje->save();
+            return view('viajes.notification', ['status' => 'success', 'message' => 'Te has inscrito correctamente en el viaje.']);
+        } catch (Exception $e) {
+            return view('viajes.notification', ['status' => 'error', 'message' => 'Hubo un problema al inscribirte en el viaje.']);
+        }
+    }
+
+    public function unsubscribe($id, $nombreUsuario)
+    {
+        $nombreUsuario = urldecode($nombreUsuario);
+        $viaje = Viajes::findOrFail($id);
+        return view('viajes.unsubscribe', compact('viaje', 'nombreUsuario'));
+    }
+
+    public function confirm_unsubscribe()
+    {
+        $request = request();
+        $id = $request->input('id');
+        $nombreUsuario = $request->input('nombreUsuario');
+        $viaje = Viajes::findOrFail($id);
+        
+        try {
+            $viaje->viajeros = array_filter($viaje->viajeros, function ($viajero) use ($nombreUsuario) {
+                return $viajero['nombre'] !== $nombreUsuario;
+            });
+            $viaje->save();
+            return view('viajes.notification', ['status' => 'success', 'message' => 'Te has desinscrito correctamente del viaje.']);
+        } catch (Exception $e) {
+            return view('viajes.notification', ['status' => 'error', 'message' => 'Hubo un problema al desinscribirte del viaje.']);
+        }
     }
 
     public function edit($id)
